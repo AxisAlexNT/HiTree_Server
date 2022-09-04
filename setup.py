@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='hict_server',
-    version='1.0rc1.dev1',
+    version='0.1.1rc1',
     packages=['hict_server', 'hict_server.api_controller'],
     url='https://genome.ifmo.ru',
     license='',
@@ -10,7 +10,7 @@ setup(
     author_email='',
     description='Development version of API and tiling server for HiCT interactive Hi-C scaffolding tool.',
     install_requires=[
-        'hict~=1.0rc1.dev1',
+        'hict~=0.1.1rc1',
         'matplotlib==3.5.2',
         'flask~=2.1.3',
         'scikit-image~=0.19.3',
