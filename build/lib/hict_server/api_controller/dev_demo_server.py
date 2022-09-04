@@ -1,4 +1,8 @@
+from argparse import ArgumentParser, Namespace
+import argparse
 import io
+import os
+from pathlib import Path
 from typing import Optional, List, Dict
 
 import flask
@@ -6,10 +10,10 @@ import numpy as np
 from PIL import Image
 from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
-from hitree.api.ContactMatrixFacet import ContactMatrixFacet
-from hitree.core.chunked_file import ChunkedFile
-from hitree.core.common import LengthUnit
-from hitree.core.contig_tree import ContigTree
+from hict.api.ContactMatrixFacet import ContactMatrixFacet
+from hict.core.chunked_file import ChunkedFile
+from hict.core.common import QueryLengthUnit
+from hict.core.contig_tree import ContigTree
 from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 
@@ -24,6 +28,7 @@ transport_dtype: str = 'uint8'
 
 filename: Optional[str] = None
 fasta_filename: Optional[str] = None
+data_path: Path = Path('./data')
 
 
 def get_contig_info(f: ChunkedFile):
@@ -64,9 +69,9 @@ def open_file():
     fasta_filename = request.args.get("fasta_filename")
     if filename is None or filename == "":
         return "Wrong filename specified", 404
-    chunked_file = ContactMatrixFacet.get_file_descriptor(f"./data/{filename}")
+    chunked_file = ContactMatrixFacet.get_file_descriptor(str(data_path.joinpath(filename).resolve().absolute()))
     if fasta_filename is not None and fasta_filename != "":
-        chunked_file.link_fasta(f"./data/{fasta_filename}")
+        chunked_file.link_fasta(str(data_path.joinpath(fasta_filename).resolve().absolute()))
     ContactMatrixFacet.open_file(chunked_file)
 
     resp = generate_contig_info()
@@ -81,7 +86,8 @@ def generate_contig_info():
     global chunked_file
     tile_size: int = int(max(chunked_file.dense_submatrix_size.values()))
 
-    resolutions: List[int] = [int(r) for r in sorted(chunked_file.resolutions, reverse=True)]
+    resolutions: List[int] = [int(r) for r in sorted(
+        chunked_file.resolutions, reverse=True)]
 
     resp: dict = {
         'status': f"OK, File opened",
@@ -90,9 +96,9 @@ def generate_contig_info():
         'pixel_resolutions': [float(r) / float(min(chunked_file.resolutions)) for r in resolutions],
         'tile_size': tile_size,
         'width': (int(chunked_file.contig_tree.root.subtree_length[
-                          chunked_file.resolutions[0]]) if chunked_file.contig_tree.root is not None else 0),
+            chunked_file.resolutions[0]]) if chunked_file.contig_tree.root is not None else 0),
         'height': (int(chunked_file.contig_tree.root.subtree_length[
-                           chunked_file.resolutions[0]]) if chunked_file.contig_tree.root is not None else 0),
+            chunked_file.resolutions[0]]) if chunked_file.contig_tree.root is not None else 0),
         'sizes': [int(chunked_file.contig_tree.root.subtree_length[r]) for r in
                   resolutions] if chunked_file.contig_tree.root is not None else [],
         'levels': len(chunked_file.resolutions),
@@ -158,9 +164,20 @@ def save():
 
     chunked_file.save()
 
-    resp: dict = {'contig_info': get_contig_info(chunked_file), 'result': "OK, file saved"}
+    resp: dict = {'contig_info': get_contig_info(
+        chunked_file), 'result': "OK, file saved"}
 
     response = make_response(jsonify(resp))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@app.post("/list_files")
+def list_files():
+    files = list(
+        sorted(map(lambda p: str(p)[5:], data_path.rglob("*.hdf5"))))
+    response = flask.jsonify(files)
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
@@ -210,11 +227,13 @@ def get_tile():
         y0,
         x1,
         y1,
-        LengthUnit.PIXELS
+        QueryLengthUnit.PIXELS
     )
 
-    padded_dense_rect: np.ndarray = np.zeros((tile_size, tile_size), dtype=dense_rect.dtype)
-    padded_dense_rect[0:dense_rect.shape[0], 0:dense_rect.shape[1]] = dense_rect
+    padded_dense_rect: np.ndarray = np.zeros(
+        (tile_size, tile_size), dtype=dense_rect.dtype)
+    padded_dense_rect[0:dense_rect.shape[0],
+                      0:dense_rect.shape[1]] = dense_rect
     dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
     # dense_rect: np.ndarray = np.log10(1+dense_rect)
 
@@ -244,5 +263,33 @@ def handle_exception(e):
     return response
 
 
-if __name__ == '__main__':
+def main():
+    global data_path
+    parser: ArgumentParser = argparse.ArgumentParser(
+        description="Run development version of HiCT tile server.",
+        epilog="Visit https://github.com/ctlab/HiCT for more info."
+    )
+
+    def dir_checker(arg_path: str) -> bool:
+        if os.path.isdir(arg_path):
+            return arg_path
+        else:
+            raise ValueError(
+                f'Path {arg_path} does not point to any directory')
+    parser.add_argument('--data-path', default='./data', type=dir_checker)
+    parser.add_argument('--log-level', choices=['CRITICAL', 'ERROR', 'WARNING', 'INFO', 'DEBUG'], default='INFO', type=str)
+    parser.add_argument('--verbose', action='store_true')
+    arguments: Namespace = parser.parse_args()
+    data_path = Path(os.path.abspath(arguments.data_path))
+    log_level_str: str
+    if arguments.verbose:
+        log_level_str = 'DEBUG'
+    else:
+        log_level_str = arguments.log_level
+    app.logger.setLevel(log_level_str)
+    app.logger.info(f"Using '{data_path}' as data directory")
     app.run(debug=True)
+
+
+if __name__ == '__main__':
+    main()
