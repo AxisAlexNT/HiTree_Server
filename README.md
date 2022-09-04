@@ -1,4 +1,4 @@
-# HiCTServer
+# HiCT_Server
 
 Simple implementation of demo/development server that bridges together [HiCT library](https://github.com/ctlab/HiCT) and [HiCT Web UI](https://github.com/AxisAlexNT/HiCT_WebUI).
 
