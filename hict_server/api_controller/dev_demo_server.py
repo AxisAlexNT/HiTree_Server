@@ -251,6 +251,21 @@ def load_agp():
     return response
 
 
+@app.get("/get_assembly_info")
+def get_assembly_info():
+    global chunked_file
+    if chunked_file is None or chunked_file.state != ChunkedFile.FileState.OPENED:
+        raise Exception("File is not opened?")
+    with chunked_file_lock.gen_wlock() as cfl:
+        assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
+
+    response = make_response(
+        jsonify(AssemblyInfoDTO.fromEntity(assemblyInfo)))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
 @ app.post("/move")
 def move():
     global chunked_file
@@ -409,9 +424,9 @@ def get_tile():
 
     resolution: int = sorted(chunked_file.resolutions)[-level]
     x0: int = row * tile_size
-    x1: int = (1 + row) * tile_size - 1
+    x1: int = (1 + row) * tile_size
     y0: int = col * tile_size
-    y1: int = (1 + col) * tile_size - 1
+    y1: int = (1 + col) * tile_size
 
     with chunked_file_lock.gen_wlock():
         dense_rect = ContactMatrixFacet.get_dense_submatrix(
