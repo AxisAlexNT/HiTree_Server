@@ -13,7 +13,7 @@ from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
-from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor
+from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, NormalizationType
 from hict.core.contig_tree import ContigTree
 from hict.core.scaffold_holder import ScaffoldHolder
 from matplotlib import pyplot as plt
@@ -421,6 +421,9 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
+    normalization_algo_int: int = int(request.args.get("normalization") if "normalization" in request.args.keys else NormalizationType.LOG2.value)
+    
+    normalization_algo: NormalizationType = NormalizationType(normalization_algo_int)
 
     resolution: int = sorted(chunked_file.resolutions)[-level]
     x0: int = row * tile_size
@@ -436,7 +439,8 @@ def get_tile():
             y0,
             x1,
             y1,
-            QueryLengthUnit.PIXELS
+            QueryLengthUnit.PIXELS,
+            normalization=normalization_algo
         )
 
     padded_dense_rect: np.ndarray = np.zeros(
