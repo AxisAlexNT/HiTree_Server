@@ -421,7 +421,7 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
-    normalization_algo_int: int = int(request.args.get("normalization") if "normalization" in request.args.keys else NormalizationType.LOG2.value)
+    normalization_algo_int: int = int(request.args.get("normalization") if "normalization" in request.args.keys() else NormalizationType.LOG10.value)
     
     normalization_algo: NormalizationType = NormalizationType(normalization_algo_int)
 
@@ -440,14 +440,15 @@ def get_tile():
             x1,
             y1,
             QueryLengthUnit.PIXELS,
-            normalization=normalization_algo
+            normalization_algo=normalization_algo
         )
 
     padded_dense_rect: np.ndarray = np.zeros(
         (tile_size, tile_size), dtype=dense_rect.dtype)
     padded_dense_rect[0:dense_rect.shape[0],
                       0: dense_rect.shape[1]] = dense_rect
-    dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
+    dense_rect: np.ndarray = padded_dense_rect
+    # dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
     # dense_rect: np.ndarray = np.log10(1+dense_rect)
 
     colored_image: np.ndarray = colormap(dense_rect)
