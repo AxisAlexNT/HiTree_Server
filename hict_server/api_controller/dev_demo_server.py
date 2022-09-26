@@ -432,7 +432,7 @@ def get_tile():
     y1: int = (1 + col) * tile_size
 
     with chunked_file_lock.gen_wlock():
-        dense_rect = ContactMatrixFacet.get_dense_submatrix(
+        raw_dense_rect = ContactMatrixFacet.get_dense_submatrix(
             chunked_file,
             resolution,
             x0,
@@ -444,11 +444,12 @@ def get_tile():
         )
 
     padded_dense_rect: np.ndarray = np.zeros(
-        (tile_size, tile_size), dtype=dense_rect.dtype)
-    padded_dense_rect[0:dense_rect.shape[0],
-                      0: dense_rect.shape[1]] = dense_rect
+        (tile_size, tile_size), dtype=raw_dense_rect.dtype)
+    padded_dense_rect[0:raw_dense_rect.shape[0],
+                      0: raw_dense_rect.shape[1]] = raw_dense_rect
+    # dense_rect: np.ndarray = np.log10(1+np.log10(1+padded_dense_rect))
+    #dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
     dense_rect: np.ndarray = padded_dense_rect
-    # dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
     # dense_rect: np.ndarray = np.log10(1+dense_rect)
 
     colored_image: np.ndarray = colormap(dense_rect)
