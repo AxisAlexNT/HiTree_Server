@@ -4,7 +4,7 @@ from collections import namedtuple
 import io
 import os
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 
 import flask
 import numpy as np
@@ -20,7 +20,7 @@ from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 from readerwriterlock import rwlock
 
-from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
+from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
 app = Flask(__name__)
 CORS(app)
@@ -37,6 +37,22 @@ data_path: Path = Path('./data')
 
 chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
+currentNormalizationSettings: NormalizationSettings = NormalizationSettings(
+    -1.0, -1.0, True
+)
+
+currentContrastRange: ContrastRangeSettings = ContrastRangeSettings(
+    0.0,
+    255.0
+)
+
+currentMinSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
+currentMaxSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
+minMaxLock: rwlock.RWLockWrite = rwlock.RWLockWrite()
+
+
+currentTileVersion: int
+versionLock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 # def get_contig_info(f: ChunkedFile) -> ContigInfo.DTO:
 #     contig_names: Dict[np.int64, str] = {}
@@ -73,6 +89,7 @@ chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 #     )
 
 #     return contig_info.to_dto()
+
 
 def get_contig_descriptors(f: ChunkedFile) -> List[ContigDescriptor]:
     descriptors: List[ContigDescriptor] = []
@@ -412,6 +429,64 @@ def get_resolutions():
     return flask.jsonify(chunked_file.resolutions)
 
 
+@ app.post("/get_current_signal_range")
+def get_current_signal_range():
+    if chunked_file is None:
+        return "File is not opened yet", 400
+    version: int = int(request.args.get("version"))
+
+    actual_version: int
+    with versionLock.gen_rlock():
+        actual_version = currentTileVersion
+
+    if version < currentTileVersion:
+        resp = make_response()
+        resp.status_code = 204
+        return resp
+    elif version > currentTileVersion:
+        bumpVersion(version)
+
+    with minMaxLock.gen_rlock():
+        return make_response(jsonify({
+            "lowerBounds": currentMinSignalValue,
+            "upperBounds": currentMaxSignalValue
+        }))
+
+
+@ app.post("/set_contrast_range")
+def set_contrast_range():
+    global currentContrastRange
+    currentContrastRange = ContrastRangeSettingsDTO(
+        request.get_json()).toEntity()
+    response = make_response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/set_normalization")
+def set_normalization():
+    global currentNormalizationSettings
+    currentNormalizationSettings = NormalizationSettingsDTO(
+        request.get_json()).toEntity()
+    response = make_response()
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+def get_raw_tile_processing_function(raw_tile: np.ndarray) -> np.ndarray:
+    if currentNormalizationSettings.preLogEnabled():
+        raw_tile = np.log(raw_tile) / currentNormalizationSettings.preLogLnBase
+    if currentNormalizationSettings.coolerBalanceEnabled():
+        # TODO
+        print("TODO")
+    if currentNormalizationSettings.postLogEnabled():
+        raw_tile = np.log(raw_tile) / \
+            currentNormalizationSettings.postLogLnBase
+    return raw_tile
+
+
 @ app.get("/get_tile")
 def get_tile():
     if chunked_file is None:
@@ -421,6 +496,18 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
+    version: int = int(request.args.get("version"))
+
+    actual_version: int
+    with versionLock.gen_rlock():
+        actual_version = currentTileVersion
+
+    if version < currentTileVersion:
+        resp = make_response()
+        resp.status_code = 204
+        return resp
+    elif version > currentTileVersion:
+        bumpVersion(version)
 
     resolution: int = sorted(chunked_file.resolutions)[-level]
     x0: int = row * tile_size
@@ -461,6 +548,14 @@ def get_tile():
     response.status_code = 200
     return response
 
+
+def bumpVersion(version: int) -> None:
+    with versionLock.gen_wlock():
+        if version > currentTileVersion:
+            currentTileVersion = version
+            with minMaxLock.gen_wlock():
+                currentMinSignalValue.clear()
+                currentMaxSignalValue.clear()
 
 # @app.errorhandler(Exception)
 # def handle_exception(e):

@@ -212,7 +212,6 @@ class GetFastaForSelectionRequestDTO:
         self.from_bp_y: int = int(request_json['fromBpY'])
         self.to_bp_x: int = int(request_json['toBpX'])
         self.to_bp_y: int = int(request_json['toBpY'])
-        
 
     def toEntity(self) -> GetFastaForSelectionRequest:
         return GetFastaForSelectionRequest(
@@ -254,4 +253,60 @@ class OpenFileResponseDTO:
             response.tileSize,
             AssemblyInfoDTO.fromEntity(response.assemblyInfo),
             [int(sz) for sz in response.matrixSizesBins]
+        )
+
+
+@dataclass
+class NormalizationSettings:
+    preLogBase: np.float64
+    preLogLnBase: np.float64
+    postLogBase: np.float64
+    postLogLnBase: np.float64
+    applyCoolerWeights: bool
+
+    def preLogEnabled(self) -> bool:
+        return self.preLogBase > np.int64(1.0)
+
+    def postLogEnabled(self) -> bool:
+        return self.postLogBase > np.int64(1.0)
+
+    def coolerBalanceEnabled(self) -> bool:
+        return self.applyCoolerWeights
+
+
+@dataclass
+class NormalizationSettingsDTO:
+    def __init__(self, request_json) -> None:
+        self.preLogBase = request_json['preLogBase']
+        self.postLogBase = request_json['postLogBase']
+        self.applyCoolerWeights = request_json['applyCoolerWeights']
+
+    def toEntity(self) -> NormalizationSettings:
+        return NormalizationSettings(
+            np.float64(self.preLogBase),
+            np.log(np.float64(self.preLogBase)) if np.float64(
+                self.preLogBase) > 1.0 else 1.0,
+            np.float64(self.postLogBase),
+            np.log(np.float64(self.postLogBase)) if np.float64(
+                self.postLogBase) > 1.0 else 1.0,
+            bool(self.applyCoolerWeights)
+        )
+
+
+@dataclass
+class ContrastRangeSettings:
+    lowerSignalBound: np.float64
+    upperSignalBound: np.float64
+
+
+@dataclass
+class ContrastRangeSettingsDTO:
+    def __init__(self, request_json) -> None:
+        self.lowerSignalBound = request_json['lowerSignalBound']
+        self.upperSignalBound = request_json['upperSignalBound']
+
+    def toEntity(self) -> ContrastRangeSettings:
+        return ContrastRangeSettings(
+            np.float64(self.lowerSignalBound),
+            np.float64(self.upperSignalBound)
         )
