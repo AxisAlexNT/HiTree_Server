@@ -51,7 +51,7 @@ currentMaxSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
 minMaxLock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 
-currentTileVersion: int
+currentTileVersion: int = 0
 versionLock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 # def get_contig_info(f: ChunkedFile) -> ContigInfo.DTO:
@@ -496,9 +496,11 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
-    normalization_algo_int: int = int(request.args.get("normalization") if "normalization" in request.args.keys() else NormalizationType.LOG10.value)
-    
-    normalization_algo: NormalizationType = NormalizationType(normalization_algo_int)
+    normalization_algo_int: int = int(request.args.get(
+        "normalization") if "normalization" in request.args.keys() else NormalizationType.LINEAR.value)
+
+    normalization_algo: NormalizationType = NormalizationType(
+        normalization_algo_int)
     version: int = int(request.args.get("version"))
 
     actual_version: int
@@ -506,7 +508,7 @@ def get_tile():
         actual_version = currentTileVersion
 
     if version < currentTileVersion:
-        resp = make_response()
+        resp = make_response("Late query: current tile version is newer")
         resp.status_code = 204
         return resp
     elif version > currentTileVersion:
@@ -556,6 +558,7 @@ def get_tile():
 
 
 def bumpVersion(version: int) -> None:
+    global currentTileVersion
     with versionLock.gen_wlock():
         if version > currentTileVersion:
             currentTileVersion = version
