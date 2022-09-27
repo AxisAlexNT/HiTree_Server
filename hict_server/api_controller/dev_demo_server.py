@@ -38,7 +38,7 @@ data_path: Path = Path('./data')
 chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 currentNormalizationSettings: NormalizationSettings = NormalizationSettings(
-    -1.0, -1.0, True
+    -1.0, 1.0, -1.0, 1.0, True
 )
 
 currentContrastRange: ContrastRangeSettings = ContrastRangeSettings(
