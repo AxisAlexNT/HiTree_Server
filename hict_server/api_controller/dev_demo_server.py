@@ -13,7 +13,7 @@ from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
-from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor
+from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, NormalizationType
 from hict.core.contig_tree import ContigTree
 from hict.core.scaffold_holder import ScaffoldHolder
 from matplotlib import pyplot as plt
@@ -496,6 +496,9 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
+    normalization_algo_int: int = int(request.args.get("normalization") if "normalization" in request.args.keys() else NormalizationType.LOG10.value)
+    
+    normalization_algo: NormalizationType = NormalizationType(normalization_algo_int)
     version: int = int(request.args.get("version"))
 
     actual_version: int
@@ -516,21 +519,24 @@ def get_tile():
     y1: int = (1 + col) * tile_size
 
     with chunked_file_lock.gen_wlock():
-        dense_rect = ContactMatrixFacet.get_dense_submatrix(
+        raw_dense_rect = ContactMatrixFacet.get_dense_submatrix(
             chunked_file,
             resolution,
             x0,
             y0,
             x1,
             y1,
-            QueryLengthUnit.PIXELS
+            QueryLengthUnit.PIXELS,
+            normalization_algo=normalization_algo
         )
 
     padded_dense_rect: np.ndarray = np.zeros(
-        (tile_size, tile_size), dtype=dense_rect.dtype)
-    padded_dense_rect[0:dense_rect.shape[0],
-                      0: dense_rect.shape[1]] = dense_rect
-    dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
+        (tile_size, tile_size), dtype=raw_dense_rect.dtype)
+    padded_dense_rect[0:raw_dense_rect.shape[0],
+                      0: raw_dense_rect.shape[1]] = raw_dense_rect
+    # dense_rect: np.ndarray = np.log10(1+np.log10(1+padded_dense_rect))
+    #dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
+    dense_rect: np.ndarray = padded_dense_rect
     # dense_rect: np.ndarray = np.log10(1+dense_rect)
 
     colored_image: np.ndarray = colormap(dense_rect)

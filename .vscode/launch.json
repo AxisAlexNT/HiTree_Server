@@ -21,6 +21,19 @@
       "jinja": true,
       "justMyCode": false
     },
+    {
+      "name": "HiCT Server from source",
+      "type": "python",
+      "request": "launch",
+      "module": "hict_server",
+      "env": {
+          "PYTHONPATH": "/home/tux/HiCT/HiCT_library/"
+      },
+      "args": [
+          "--verbose"
+      ],
+      "justMyCode": true
+  },
     /* {
       "name": "HiCT server from pip hict",
       "type": "python",
