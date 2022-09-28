@@ -1,10 +1,14 @@
 from argparse import ArgumentParser, Namespace
 import argparse
+from cmath import isclose
 from collections import namedtuple
+from filecmp import DEFAULT_IGNORES
 import io
 import os
 from pathlib import Path
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Tuple, Union
+from base64 import encodebytes
+from urllib import response
 
 import flask
 import numpy as np
@@ -13,7 +17,7 @@ from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
-from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, NormalizationType
+from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor
 from hict.core.contig_tree import ContigTree
 from hict.core.scaffold_holder import ScaffoldHolder
 from matplotlib import pyplot as plt
@@ -37,14 +41,18 @@ data_path: Path = Path('./data')
 
 chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
-currentNormalizationSettings: NormalizationSettings = NormalizationSettings(
+DEFAULT_NORMALIZATION_SETTINGS: NormalizationSettings = NormalizationSettings(
     -1.0, 1.0, -1.0, 1.0, True
 )
 
-currentContrastRange: ContrastRangeSettings = ContrastRangeSettings(
+DEFAULT_CONTRAST_RANGE: ContrastRangeSettings = ContrastRangeSettings(
     0.0,
-    255.0
+    1.0
 )
+
+
+currentNormalizationSettings: NormalizationSettings = DEFAULT_NORMALIZATION_SETTINGS
+currentContrastRange: ContrastRangeSettings = DEFAULT_CONTRAST_RANGE
 
 currentMinSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
 currentMaxSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
@@ -119,7 +127,7 @@ def generate_assembly_info(f: ChunkedFile) -> AssemblyInfo:
 
 @app.post("/open")
 def open_file():
-    global chunked_file, filename, fasta_filename
+    global chunked_file, filename, fasta_filename, currentTileVersion, currentNormalizationSettings, currentContrastRange
     req = request.get_json()
     filename = req["filename"]
     fasta_filename = req["fastaFilename"]
@@ -130,6 +138,10 @@ def open_file():
     if filename is None or filename == "":
         return "Wrong filename specified", 404
     # TODO: Fix this
+
+    currentTileVersion = 0
+    currentNormalizationSettings = DEFAULT_NORMALIZATION_SETTINGS
+    currentContrastRange = DEFAULT_CONTRAST_RANGE
     chunked_file = ContactMatrixFacet.get_file_descriptor(
         str(data_path.joinpath(filename).resolve().absolute()))
     # chunked_file = ContactMatrixFacet.get_file_descriptor(filename)
@@ -433,17 +445,17 @@ def get_resolutions():
 def get_current_signal_range():
     if chunked_file is None:
         return "File is not opened yet", 400
-    version: int = int(request.args.get("version"))
+    version: int = int(request.get_json()["tileVersion"])
 
     actual_version: int
     with versionLock.gen_rlock():
         actual_version = currentTileVersion
 
-    if version < currentTileVersion:
+    if version < actual_version:
         resp = make_response()
         resp.status_code = 204
         return resp
-    elif version > currentTileVersion:
+    elif version > actual_version:
         bumpVersion(version)
 
     with minMaxLock.gen_rlock():
@@ -475,19 +487,45 @@ def set_normalization():
     return response
 
 
-def get_raw_tile_processing_function(raw_tile: np.ndarray) -> np.ndarray:
+def normalize_tile(
+    raw_tile: np.ndarray,
+    weights: Optional[Tuple[np.ndarray, np.ndarray]]
+) -> np.ndarray:
     if currentNormalizationSettings.preLogEnabled():
-        raw_tile = np.log(raw_tile) / currentNormalizationSettings.preLogLnBase
+        raw_tile = np.log1p(raw_tile) / \
+            currentNormalizationSettings.preLogLnBase
     if currentNormalizationSettings.coolerBalanceEnabled():
-        # TODO
-        print("TODO")
+        assert weights is not None, "Requested cooler balancing but didn't provide the weights?"
+        raw_tile = ContactMatrixFacet.apply_cooler_balance_to_dense_matrix(
+            raw_tile,
+            weights[0],
+            weights[1],
+            inplace=True
+        )
     if currentNormalizationSettings.postLogEnabled():
-        raw_tile = np.log(raw_tile) / \
+        raw_tile = np.log1p(raw_tile) / \
             currentNormalizationSettings.postLogLnBase
     return raw_tile
 
 
-@ app.get("/get_tile")
+def contrast_tile(
+    raw_tile: np.ndarray
+) -> np.ndarray:
+    lower_bound, upper_bound = (
+        currentContrastRange.lowerSignalBound,
+        currentContrastRange.upperSignalBound,
+    )
+    range = upper_bound - lower_bound
+    if np.isclose(range, 0):
+        range = 1.0
+    raw_tile = raw_tile - currentContrastRange.lowerSignalBound
+    raw_tile[raw_tile < 0] = 0
+    raw_tile[raw_tile > range] = range
+    raw_tile = raw_tile / range
+    return raw_tile
+
+
+@app.get("/get_tile")
 def get_tile():
     if chunked_file is None:
         return "File is not opened yet", 400
@@ -496,22 +534,17 @@ def get_tile():
     row: int = int(request.args.get("row"))
     col: int = int(request.args.get("col"))
     tile_size: int = int(request.args.get("tile_size"))
-    normalization_algo_int: int = int(request.args.get(
-        "normalization") if "normalization" in request.args.keys() else NormalizationType.LINEAR.value)
-
-    normalization_algo: NormalizationType = NormalizationType(
-        normalization_algo_int)
     version: int = int(request.args.get("version"))
 
     actual_version: int
     with versionLock.gen_rlock():
         actual_version = currentTileVersion
 
-    if version < currentTileVersion:
+    if version < actual_version:
         resp = make_response("Late query: current tile version is newer")
         resp.status_code = 204
         return resp
-    elif version > currentTileVersion:
+    elif version > actual_version:
         bumpVersion(version)
 
     resolution: int = sorted(chunked_file.resolutions)[-level]
@@ -521,7 +554,7 @@ def get_tile():
     y1: int = (1 + col) * tile_size
 
     with chunked_file_lock.gen_wlock():
-        raw_dense_rect = ContactMatrixFacet.get_dense_submatrix(
+        raw_dense_rect, row_weights, col_weights = ContactMatrixFacet.get_dense_submatrix(
             chunked_file,
             resolution,
             x0,
@@ -529,19 +562,29 @@ def get_tile():
             x1,
             y1,
             QueryLengthUnit.PIXELS,
-            normalization_algo=normalization_algo
+            fetch_cooler_weights=currentNormalizationSettings.coolerBalanceEnabled()
         )
 
-    padded_dense_rect: np.ndarray = np.zeros(
-        (tile_size, tile_size), dtype=raw_dense_rect.dtype)
-    padded_dense_rect[0:raw_dense_rect.shape[0],
-                      0: raw_dense_rect.shape[1]] = raw_dense_rect
-    # dense_rect: np.ndarray = np.log10(1+np.log10(1+padded_dense_rect))
-    #dense_rect: np.ndarray = np.log10(1 + padded_dense_rect)
-    dense_rect: np.ndarray = padded_dense_rect
-    # dense_rect: np.ndarray = np.log10(1+dense_rect)
+    dense_rect: np.ndarray = normalize_tile(
+        raw_dense_rect, (row_weights, col_weights))
 
-    colored_image: np.ndarray = colormap(dense_rect)
+    if dense_rect.size > 0:
+        minValue = dense_rect.min()
+        maxValue = dense_rect.max()
+        with minMaxLock.gen_wlock():
+            if level not in currentMinSignalValue.keys() or currentMinSignalValue[level] > minValue:
+                currentMinSignalValue[level] = minValue
+            if level not in currentMaxSignalValue.keys() or currentMaxSignalValue[level] < maxValue:
+                currentMaxSignalValue[level] = maxValue
+
+    dense_rect = contrast_tile(dense_rect)
+
+    padded_dense_rect: np.ndarray = np.zeros(
+        (tile_size, tile_size), dtype=dense_rect.dtype)
+    padded_dense_rect[0:dense_rect.shape[0],
+                      0: dense_rect.shape[1]] = dense_rect
+
+    colored_image: np.ndarray = colormap(padded_dense_rect)
     image_matrix: np.ndarray = colored_image[:, :, : 3] * 255
     image_matrix = image_matrix.astype(transport_dtype)
 
@@ -550,8 +593,19 @@ def get_tile():
     buf = io.BytesIO()
     image.save(buf, format='PNG')
     buf.seek(0)
+    
+    ranges: Dict
+    with minMaxLock.gen_rlock():
+        ranges = {
+            "lowerBounds": currentMinSignalValue,
+            "upperBounds": currentMaxSignalValue
+        }
 
-    response = make_response(send_file(buf, mimetype="image/png"))
+    # response = make_response(send_file(buf, mimetype="image/png"))
+    response = make_response(jsonify({
+        "ranges": ranges,
+        "image": encodebytes(buf.getvalue()).decode('ascii') # encode as base64
+    }))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
