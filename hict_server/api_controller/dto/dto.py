@@ -63,8 +63,8 @@ class ScaffoldDescriptorDTO:
             int(descriptor.scaffold_id),
             descriptor.scaffold_name,
             ScaffoldBordersDTO.fromEntity(descriptor.scaffold_borders),
-            descriptor.scaffold_direction.value,
-            descriptor.spacer_length
+            int(descriptor.scaffold_direction.value),
+            int(descriptor.spacer_length)
         )
 
 
@@ -246,11 +246,11 @@ class OpenFileResponseDTO:
     @staticmethod
     def fromEntity(response: OpenFileResponse) -> 'OpenFileResponseDTO':
         return OpenFileResponseDTO(
-            response.status,
+            str(response.status),
             str(response.dtype),
             [int(r) for r in response.resolutions],
             [float(pr) for pr in response.pixelResolutions],
-            response.tileSize,
+            int(response.tileSize),
             AssemblyInfoDTO.fromEntity(response.assemblyInfo),
             [int(sz) for sz in response.matrixSizesBins]
         )

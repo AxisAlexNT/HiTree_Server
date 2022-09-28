@@ -363,9 +363,10 @@ def save():
 
     with chunked_file_lock.gen_wlock() as cfl:
         chunked_file.save()
-
-    resp: dict = {'contig_info': get_contig_descriptors(
-        chunked_file), 'result': "OK, file saved"}
+        resp: dict = {
+            'assembly': AssemblyInfoDTO.fromEntity(generate_assembly_info(chunked_file)),
+            'result': "OK, file saved"
+        }
 
     response = make_response(jsonify(resp))
     response.headers['Access-Control-Allow-Origin'] = '*'
