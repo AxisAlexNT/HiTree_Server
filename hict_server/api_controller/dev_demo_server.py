@@ -54,8 +54,8 @@ DEFAULT_CONTRAST_RANGE: ContrastRangeSettings = ContrastRangeSettings(
 currentNormalizationSettings: NormalizationSettings = DEFAULT_NORMALIZATION_SETTINGS
 currentContrastRange: ContrastRangeSettings = DEFAULT_CONTRAST_RANGE
 
-currentMinSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
-currentMaxSignalValue: Dict[int, Union[np.float64, np.int64]] = dict()
+currentMinSignalValue: Dict[int, Union[float, int]] = dict()
+currentMaxSignalValue: Dict[int, Union[float, int]] = dict()
 minMaxLock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 
@@ -569,8 +569,14 @@ def get_tile():
         raw_dense_rect, (row_weights, col_weights))
 
     if dense_rect.size > 0:
-        minValue = dense_rect.min()
-        maxValue = dense_rect.max()
+        minValue = int(dense_rect.min()) if (
+            dense_rect.dtype in (np.int64, np.int32,
+                                 np.int16, np.int8)
+        ) else float(dense_rect.min())
+        maxValue = int(dense_rect.max()) if (
+            dense_rect.dtype in (np.int64, np.int32,
+                                 np.int16, np.int8)
+        )else float(dense_rect.max())
         with minMaxLock.gen_wlock():
             if level not in currentMinSignalValue.keys() or currentMinSignalValue[level] > minValue:
                 currentMinSignalValue[level] = minValue
@@ -593,7 +599,7 @@ def get_tile():
     buf = io.BytesIO()
     image.save(buf, format='PNG')
     buf.seek(0)
-    
+
     ranges: Dict
     with minMaxLock.gen_rlock():
         ranges = {
@@ -604,7 +610,8 @@ def get_tile():
     # response = make_response(send_file(buf, mimetype="image/png"))
     response = make_response(jsonify({
         "ranges": ranges,
-        "image": encodebytes(buf.getvalue()).decode('ascii') # encode as base64
+        # encode as base64
+        "image": encodebytes(buf.getvalue()).decode('ascii')
     }))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
