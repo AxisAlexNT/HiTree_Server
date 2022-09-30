@@ -612,7 +612,7 @@ def get_tile():
     response = make_response(jsonify({
         "ranges": ranges,
         # encode as base64
-        "image": encodebytes(buf.getvalue()).decode('ascii')
+        "image": "".join(("data:image/png;base64,", encodebytes(buf.getvalue()).decode('ascii')))
     }))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
