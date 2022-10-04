@@ -436,6 +436,22 @@ def get_fasta_for_assembly():
     response.status_code = 200
     return response
 
+@ app.post("/get_agp_for_assembly")
+def get_agp_for_assembly():
+    global chunked_file
+    if chunked_file is None or chunked_file.state != ChunkedFile.FileState.OPENED:
+        raise Exception("File is not opened?")
+
+    buf = io.BytesIO()
+    with chunked_file_lock.gen_wlock() as cfl:
+        chunked_file.get_agp_for_assembly(buf)
+    buf.seek(0)
+
+    response = make_response(send_file(buf, mimetype="text/plain"))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
 
 @ app.get("/get_resolutions")
 def get_resolutions():
