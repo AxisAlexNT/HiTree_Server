@@ -5,22 +5,48 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "HiCT server from hict source",
+      "name": "[win-flask] HiCT server from hict source",
       "type": "python",
       "request": "launch",
       "module": "flask",
       "env": {
-        "PYTHONPATH": "$PYTHONPATH:../hict/",
+        "PYTHONPATH": "C:\\Users\\tux\\Documents\\HiCT\\HiCT_Library",
         "FLASK_APP": "hict_server/api_controller/dev_demo_server.py",
         "FLASK_ENV": "development"
       },
       "args": [
         "run",
-        "--no-debugger"
+        "--no-debugger",
+        "--verbose"
       ],
       "jinja": true,
       "justMyCode": false
     },
+    {
+      "name": "[nix] HiCT Server from source",
+      "type": "python",
+      "request": "launch",
+      "module": "hict_server",
+      "env": {
+          "PYTHONPATH": "/home/tux/HiCT/HiCT_library/"
+      },
+      "args": [
+          "--verbose"
+      ],
+      "justMyCode": true
+  },{
+      "name": "[win] HiCT Server from source",
+      "type": "python",
+      "request": "launch",
+      "module": "hict_server",
+      "env": {
+          "PYTHONPATH": "C:\\Users\\tux\\Documents\\HiCT\\HiCT_Library"
+      },
+      "args": [
+          "--verbose"
+      ],
+      "justMyCode": true
+  },
     /* {
       "name": "HiCT server from pip hict",
       "type": "python",
