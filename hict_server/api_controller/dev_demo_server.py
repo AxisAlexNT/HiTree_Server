@@ -570,17 +570,17 @@ def get_tile():
     y0: int = col * tile_size
     y1: int = (1 + col) * tile_size
 
-    with chunked_file_lock.gen_wlock():
-        raw_dense_rect, row_weights, col_weights = ContactMatrixFacet.get_dense_submatrix(
-            chunked_file,
-            resolution,
-            x0,
-            y0,
-            x1,
-            y1,
-            QueryLengthUnit.PIXELS,
-            fetch_cooler_weights=currentNormalizationSettings.coolerBalanceEnabled()
-        )
+    # with chunked_file_lock.gen_wlock():
+    raw_dense_rect, row_weights, col_weights = ContactMatrixFacet.get_dense_submatrix(
+        chunked_file,
+        resolution,
+        x0,
+        y0,
+        x1,
+        y1,
+        QueryLengthUnit.PIXELS,
+        fetch_cooler_weights=currentNormalizationSettings.coolerBalanceEnabled()
+    )
 
     dense_rect: np.ndarray = normalize_tile(
         raw_dense_rect, (row_weights, col_weights))
