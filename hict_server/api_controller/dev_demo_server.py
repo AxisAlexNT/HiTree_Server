@@ -42,7 +42,7 @@ data_path: Path = Path('./data')
 chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 DEFAULT_NORMALIZATION_SETTINGS: NormalizationSettings = NormalizationSettings(
-    -1.0, 1.0, -1.0, 1.0, True
+    -1.0, 1.0, 10.0, np.log(10.0), False
 )
 
 DEFAULT_CONTRAST_RANGE: ContrastRangeSettings = ContrastRangeSettings(
@@ -631,7 +631,7 @@ def get_tile():
         "image": "".join(("data:image/png;base64,", encodebytes(buf.getvalue()).decode('ascii')))
     }))
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.status_code = 200
+    response.status_code = 200 # if version % 2 == 0 else 204
     return response
 
 
