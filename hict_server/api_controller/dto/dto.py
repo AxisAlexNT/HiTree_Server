@@ -1,3 +1,4 @@
+from ast import Tuple
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import numpy as np
@@ -272,6 +273,34 @@ class NormalizationSettings:
 
     def coolerBalanceEnabled(self) -> bool:
         return self.applyCoolerWeights
+
+
+@dataclass
+class StripeIntersectionRequest:
+    rowStripeIds: List[int]
+    colStripeIds: List[int]
+    normalizationSettings: NormalizationSettings
+    bordersInCoverageMatrix: Tuple[int, int, int, int]
+
+
+@dataclass
+class StripeIntersectionRequestDTO:
+    def __init__(self, request_json) -> None:
+        self.rowStripeIds: List[int] = request_json['rowStripeIds']
+        self.colStripeIds: List[int] = request_json['colStripeIds']
+        self.normalizationSettings: NormalizationSettingsDTO = NormalizationSettingsDTO(
+            request_json['normalizationSettings'])
+        self.bordersInCoverageMatrix: Tuple[
+            int, int, int, int
+        ] = request_json['bordersInCoverageMatrix']
+
+    def toEntity(self) -> StripeIntersectionRequest:
+        return StripeIntersectionRequest(
+            list(map(int, self.rowStripeIds)),
+            list(map(int, self.colStripeIds)),
+            self.normalizationSettings.toEntity(),
+            tuple(map(int, self.bordersInCoverageMatrix))
+        )
 
 
 @dataclass

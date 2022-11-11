@@ -631,7 +631,99 @@ def get_tile():
         "image": "".join(("data:image/png;base64,", encodebytes(buf.getvalue()).decode('ascii')))
     }))
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.status_code = 200 # if version % 2 == 0 else 204
+    response.status_code = 200 if version % 2 == 0 else 204
+    return response
+
+@app.get("/get_stripe_intersection")
+def get_stripe_intersection():
+    if chunked_file is None:
+        return "File is not opened yet", 400
+
+    level: int = int(request.args.get("level"))
+    row: int = int(request.args.get("row"))
+    col: int = int(request.args.get("col"))
+    tile_size: int = int(request.args.get("tile_size"))
+    version: int = int(request.args.get("version"))
+
+    actual_version: int
+    with versionLock.gen_rlock():
+        actual_version = currentTileVersion
+
+    if version < actual_version:
+        resp = make_response("Late query: current tile version is newer")
+        resp.status_code = 204
+        return resp
+    elif version > actual_version:
+        bumpVersion(version)
+
+    resolution: int = sorted(chunked_file.resolutions)[-level]
+    x0: int = row * tile_size
+    x1: int = (1 + row) * tile_size
+    y0: int = col * tile_size
+    y1: int = (1 + col) * tile_size
+
+    # with chunked_file_lock.gen_wlock():
+    raw_dense_rect, row_weights, col_weights = ContactMatrixFacet.get_dense_submatrix(
+        chunked_file,
+        resolution,
+        x0,
+        y0,
+        x1,
+        y1,
+        QueryLengthUnit.PIXELS,
+        fetch_cooler_weights=currentNormalizationSettings.coolerBalanceEnabled()
+    )
+
+    dense_rect: np.ndarray = normalize_tile(
+        raw_dense_rect, (row_weights, col_weights))
+
+    if dense_rect.size > 0:
+        minValue = int(dense_rect.min()) if (
+            dense_rect.dtype in (np.int64, np.int32,
+                                 np.int16, np.int8)
+        ) else float(dense_rect.min())
+        maxValue = int(dense_rect.max()) if (
+            dense_rect.dtype in (np.int64, np.int32,
+                                 np.int16, np.int8)
+        )else float(dense_rect.max())
+        with minMaxLock.gen_wlock():
+            if level not in currentMinSignalValue.keys() or currentMinSignalValue[level] > minValue:
+                currentMinSignalValue[level] = minValue
+            if level not in currentMaxSignalValue.keys() or currentMaxSignalValue[level] < maxValue:
+                currentMaxSignalValue[level] = maxValue
+
+    dense_rect = contrast_tile(dense_rect)
+
+    padded_dense_rect: np.ndarray = np.zeros(
+        (tile_size, tile_size), dtype=dense_rect.dtype)
+    padded_dense_rect[0:dense_rect.shape[0],
+                      0: dense_rect.shape[1]] = dense_rect
+
+    colored_image: np.ndarray = colormap(padded_dense_rect)
+    image_matrix: np.ndarray = colored_image[:, :, : 3] * 255
+    image_matrix = image_matrix.astype(transport_dtype)
+
+    image: Image = Image.fromarray(image_matrix)
+
+    buf = io.BytesIO()
+    image.save(buf, format='PNG')
+    buf.seek(0)
+
+    ranges: Dict
+    with minMaxLock.gen_rlock():
+        ranges = {
+            "lowerBounds": currentMinSignalValue,
+            "upperBounds": currentMaxSignalValue
+        }
+
+    # response = make_response(send_file(buf, mimetype="image/png"))
+    response = make_response(jsonify({
+        "ranges": ranges,
+        # encode as base64
+        "image": "".join(("data:image/png;base64,", encodebytes(buf.getvalue()).decode('ascii')))
+    }))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200 if version % 2 == 0 else 204
     return response
 
 
