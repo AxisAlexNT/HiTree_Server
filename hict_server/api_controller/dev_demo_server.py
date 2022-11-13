@@ -26,6 +26,8 @@ from readerwriterlock import rwlock
 
 from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
+from werkzeug.middleware.profiler import ProfilerMiddleware
+
 app = Flask(__name__)
 CORS(app)
 
@@ -653,7 +655,6 @@ def bumpVersion(version: int) -> None:
 #     response.status_code = 500
 #     return response
 
-
 def main():
     global data_path
     parser: ArgumentParser = argparse.ArgumentParser(
@@ -682,6 +683,8 @@ def main():
     app.logger.info(f"Using '{data_path}' as data directory")
     app.run(debug=True)
 
+
+# app.wsgi_app = ProfilerMiddleware(app.wsgi_app, profile_dir="./internal-profiler/")
 
 if __name__ == '__main__':
     main()
