@@ -28,7 +28,7 @@
       "request": "launch",
       "module": "hict_server",
       "env": {
-          "PYTHONPATH": "/home/tux/HiCT/HiCT_library/"
+          "PYTHONPATH": "/home/tux/HiCT/HiCT_Library/"
       },
       "args": [
           "--verbose"
