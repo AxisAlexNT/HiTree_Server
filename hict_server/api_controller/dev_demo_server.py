@@ -44,7 +44,7 @@ data_path: Path = Path('./data')
 chunked_file_lock: rwlock.RWLockWrite = rwlock.RWLockWrite()
 
 DEFAULT_NORMALIZATION_SETTINGS: NormalizationSettings = NormalizationSettings(
-    -1.0, 1.0, -1.0, 1.0, True
+    -1.0, 1.0, 10, np.log(10.0), False
 )
 
 DEFAULT_CONTRAST_RANGE: ContrastRangeSettings = ContrastRangeSettings(
