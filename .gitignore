@@ -1,3 +1,5 @@
+.idea/
+.vscode/
 data/*
 /dist/
 /hict_server.egg-info/
