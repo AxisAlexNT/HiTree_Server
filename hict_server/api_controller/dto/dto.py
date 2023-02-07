@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import numpy as np
-from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBorders
+from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBorders, ContigDirection
 
 
 @dataclass
@@ -28,7 +28,7 @@ class ContigDescriptorDTO:
         return ContigDescriptorDTO(
             int(descriptor.contig_id),
             str(descriptor.contig_name),
-            descriptor.direction.value,
+            ContigDirection.FORWARD.value, # descriptor.direction.value, # TODO: Implement direction transfer between UI and server with directions inside nodes!
             int(descriptor.contig_length_at_resolution[0]),
             contig_length_at_resolution,
             str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
