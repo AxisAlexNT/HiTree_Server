@@ -5,6 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python: Current File with HiCT_Library from source",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/../../HiCT_Library"
+            }
+        },
+        {
             "name": "Python: Flask",
             "type": "python",
             "request": "launch",
