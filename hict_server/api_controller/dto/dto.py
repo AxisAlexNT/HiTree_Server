@@ -26,13 +26,13 @@ class ContigDescriptorDTO:
                 presence_in_resolution[int_res] = descriptor.presence_in_resolution[res].value
 
         return ContigDescriptorDTO(
-            int(descriptor.contig_id),
-            str(descriptor.contig_name),
-            ContigDirection.FORWARD.value, # descriptor.direction.value, # TODO: Implement direction transfer between UI and server with directions inside nodes!
-            int(descriptor.contig_length_at_resolution[0]),
-            contig_length_at_resolution,
-            str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
-            presence_in_resolution
+            contigId=int(descriptor.contig_id),
+            contigName=str(descriptor.contig_name),
+            contigDirection=ContigDirection.FORWARD.value, # descriptor.direction.value, # TODO: Implement direction transfer between UI and server with directions inside nodes!
+            contigLengthBp=int(descriptor.contig_length_at_resolution[0]),
+            contigLengthBins=contig_length_at_resolution,
+            scaffoldId=str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
+            contigPresenceAtResolution=presence_in_resolution
         )
 
 
