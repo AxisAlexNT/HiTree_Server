@@ -29,6 +29,10 @@ from readerwriterlock import rwlock
 from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
 
+enable_profiler: bool = True
+
+
+
 data_path: Path = Path('./data')
 mp_manager: multiprocessing.managers.SyncManager = multiprocessing.Manager()
 
@@ -38,8 +42,13 @@ def get_rlock():
     return rlock
 
 
-
 app = Flask(__name__)
+if enable_profiler:
+    from werkzeug.middleware.profiler import ProfilerMiddleware
+    profile_dir=Path('./profiler')
+    os.makedirs(profile_dir, exist_ok=True)
+    profile_stream = open(f"{str(profile_dir)}/concat.prof", mode="w")
+    app.wsgi_app=ProfilerMiddleware(app.wsgi_app, profile_dir=str(profile_dir.absolute()), stream=profile_stream)
 CORS(app)
 
 chunked_file: Optional[ChunkedFile] = None
