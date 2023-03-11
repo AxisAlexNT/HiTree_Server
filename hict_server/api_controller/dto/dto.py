@@ -31,7 +31,7 @@ class ContigDescriptorDTO:
             contigDirection=ContigDirection.FORWARD.value, # descriptor.direction.value, # TODO: Implement direction transfer between UI and server with directions inside nodes!
             contigLengthBp=int(descriptor.contig_length_at_resolution[0]),
             contigLengthBins=contig_length_at_resolution,
-            scaffoldId=str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
+            scaffoldId=None, #str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
             contigPresenceAtResolution=presence_in_resolution
         )
 
