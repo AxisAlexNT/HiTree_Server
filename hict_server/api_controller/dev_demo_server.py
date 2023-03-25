@@ -19,12 +19,13 @@ from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
-from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor
+from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, ContigDirection
 from hict.core.contig_tree import ContigTree
-from hict.core.scaffold_holder import ScaffoldHolder
+from hict.core.scaffold_tree import ScaffoldTree
 from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 from readerwriterlock import rwlock
+from HiCT_Library.hict.core.common import ScaffoldBordersBP
 
 from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
@@ -86,58 +87,17 @@ currentTileVersion: int = 0
 versionLock: rwlock.RWLockWrite = rwlock.RWLockWrite(
     lock_factory=get_rlock)
 
-# def get_contig_info(f: ChunkedFile) -> ContigInfo.DTO:
-#     contig_names: Dict[np.int64, str] = {}
-#     contig_name_to_id: Dict[str, np.int64] = {}
-
-#     for contig_id, contig_name in enumerate(f.contig_names):
-#         contig_names[contig_id] = str(contig_name)
-#         contig_name_to_id[str(contig_name)] = contig_id
-
-#     contig_size: Dict[np.int64, List[np.int64]] = {}
-#     contig_direction: List[ContigDirection] = []
-#     contig_ord_ids: List[np.int64] = []
-#     resolution_to_ord_contig_hide_type: Dict[int, List[ContigHideType]] = {}
-
-#     def visit_node(n: ContigTree.Node):
-#         nonlocal contig_size
-#         for res, length in n.true_contig_descriptor().contig_length_at_resolution.items():
-#             if res not in contig_size.keys():
-#                 contig_size[res] = []
-#                 resolution_to_ord_contig_hide_type[res] = []
-#             contig_size[res].append(length)
-#             resolution_to_ord_contig_hide_type[res].append(n.contig_descriptor.presence_in_resolution[res])
-#         contig_direction.append(n.true_direction())
-#         contig_ord_ids.append(n.contig_descriptor.contig_id)
-
-#     f.contig_tree.traverse(visit_node)
-#     contig_info: ContigInfo = ContigInfo(
-#         contig_size,
-#         contig_direction,
-#         contig_ord_ids,
-#         contig_names,
-#         contig_name_to_id,
-#         resolution_to_ord_contig_hide_type
-#     )
-
-#     return contig_info.to_dto()
-
-def get_contig_descriptors(f: ChunkedFile) -> List[ContigDescriptor]:
+def get_contig_descriptors(f: ChunkedFile) -> List[Tuple[ContigDescriptor, ContigDirection]]:
     descriptors: List[ContigDescriptor] = []
-
     def visit_node(n: ContigTree.Node):
-        descriptors.append(n.contig_descriptor)
-
+        descriptors.append((n.contig_descriptor, n.direction))
     f.contig_tree.traverse(visit_node)
-
     return descriptors
 
-def get_scaffold_descriptors(f: ChunkedFile) -> List[ScaffoldDescriptor]:
-    scaffoldHolder: ScaffoldHolder = f.scaffold_holder
-    descriptors: List[ScaffoldDescriptor] = []
-    for scaffoldDescriptor in scaffoldHolder.scaffold_table.values():
-        descriptors.append(scaffoldDescriptor)
-    return list(filter(lambda sd: f.scaffold_housekeeping(sd.scaffold_id) is not None, descriptors))
+def get_scaffold_descriptors(f: ChunkedFile) -> List[Tuple[ScaffoldDescriptor, ScaffoldBordersBP]]:
+    scaffoldTree: ScaffoldTree = f.scaffold_tree
+    descriptors: List[Tuple[ScaffoldDescriptor, ScaffoldBordersBP]] = scaffoldTree.get_scaffold_list()    
+    return descriptors
 
 def generate_assembly_info(f: ChunkedFile) -> AssemblyInfo:
     return AssemblyInfo(

@@ -1,7 +1,9 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
 from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBorders, ContigDirection
+
+from HiCT_Library.hict.core.common import ScaffoldBordersBP
 
 
 @dataclass
@@ -15,7 +17,7 @@ class ContigDescriptorDTO:
     contigPresenceAtResolution: Dict[int, int]
 
     @staticmethod
-    def fromEntity(descriptor: ContigDescriptor) -> 'ContigDescriptorDTO':
+    def fromEntity(descriptor: ContigDescriptor, direction: ContigDirection) -> 'ContigDescriptorDTO':
         contig_length_at_resolution: Dict[int, int] = dict()
         presence_in_resolution: Dict[int, int] = dict()
 
@@ -28,22 +30,21 @@ class ContigDescriptorDTO:
         return ContigDescriptorDTO(
             contigId=int(descriptor.contig_id),
             contigName=str(descriptor.contig_name),
-            contigDirection=ContigDirection.FORWARD.value, # descriptor.direction.value, # TODO: Implement direction transfer between UI and server with directions inside nodes!
+            contigDirection=direction.value,
             contigLengthBp=int(descriptor.contig_length_at_resolution[0]),
             contigLengthBins=contig_length_at_resolution,
-            scaffoldId=None, #str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
             contigPresenceAtResolution=presence_in_resolution
         )
 
 
 @dataclass
-class ScaffoldBordersDTO:
-    startContigId: int
-    endContigId: int
+class ScaffoldBordersBPDTO:
+    startBP: int
+    endBP: int
 
     @staticmethod
-    def fromEntity(borders: Optional[ScaffoldBorders]) -> Optional['ScaffoldBordersDTO']:
-        return ScaffoldBordersDTO(
+    def fromEntity(borders: Optional[ScaffoldBordersBP]) -> Optional['ScaffoldBordersBPDTO']:
+        return ScaffoldBordersBPDTO(
             int(borders.start_contig_id),
             int(borders.end_contig_id)
         ) if borders is not None else None
@@ -53,24 +54,22 @@ class ScaffoldBordersDTO:
 class ScaffoldDescriptorDTO:
     scaffoldId: int
     scaffoldName: str
-    scaffoldBorders: Optional[ScaffoldBordersDTO]
-    scaffoldDirection: int
     spacerLength: int
+    borders: ScaffoldBordersBP
 
     @staticmethod
-    def fromEntity(descriptor: ScaffoldDescriptor) -> 'ScaffoldDescriptorDTO':
+    def fromEntity(descriptor: Tuple[ScaffoldDescriptor, ScaffoldBordersBP]) -> 'ScaffoldDescriptorDTO':
         return ScaffoldDescriptorDTO(
-            int(descriptor.scaffold_id),
-            descriptor.scaffold_name,
-            ScaffoldBordersDTO.fromEntity(descriptor.scaffold_borders),
-            int(descriptor.scaffold_direction.value),
-            int(descriptor.spacer_length)
+            int(descriptor[0].scaffold_id),
+            descriptor[0].scaffold_name,
+            int(descriptor[0].spacer_length),
+            ScaffoldBordersBPDTO.fromEntity(descriptor[1])
         )
 
 
 @dataclass
 class AssemblyInfo:
-    contigDescriptors: List[ContigDescriptor]
+    contigDescriptors: List[Tuple[ContigDescriptor, ContigDirection]]
     scaffoldDescriptors: List[ScaffoldDescriptor]
 
 
@@ -82,8 +81,8 @@ class AssemblyInfoDTO:
     @staticmethod
     def fromEntity(assembly: AssemblyInfo) -> 'AssemblyInfoDTO':
         return AssemblyInfoDTO(
-            [ContigDescriptorDTO.fromEntity(descriptor)
-             for descriptor in assembly.contigDescriptors],
+            [ContigDescriptorDTO.fromEntity(descriptor, dir)
+             for descriptor, dir in assembly.contigDescriptors],
             [ScaffoldDescriptorDTO.fromEntity(descriptor)
              for descriptor in assembly.scaffoldDescriptors
              ]
