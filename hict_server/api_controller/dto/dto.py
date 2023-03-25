@@ -99,14 +99,14 @@ class GroupContigsIntoScaffoldRequest:
 
 @dataclass
 class GroupContigsIntoScaffoldRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    start_bp: int
     name: Optional[str]
     spacer_length: Optional[int]
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.start_bp: int = int(request_json['endBP'])
         self.name: Optional[str] = (
             request_json['scaffoldName'] if 'scaffoldName' in request_json.keys() else None)
         self.spacer_length: Optional[int] = int(
@@ -114,8 +114,8 @@ class GroupContigsIntoScaffoldRequestDTO:
 
     def toEntity(self) -> GroupContigsIntoScaffoldRequest:
         return GroupContigsIntoScaffoldRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.start_bp),
             self.name if self.name != "" else None,
             self.spacer_length
         )
@@ -123,71 +123,71 @@ class GroupContigsIntoScaffoldRequestDTO:
 
 @dataclass
 class UngroupContigsFromScaffoldRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
 
 
 @dataclass
 class UngroupContigsFromScaffoldRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    end_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
 
     def toEntity(self) -> UngroupContigsFromScaffoldRequest:
         return UngroupContigsFromScaffoldRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
         )
 
 
 @dataclass
 class ReverseSelectionRangeRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
 
 
 @dataclass
 class ReverseSelectionRangeRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    end_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
 
     def toEntity(self) -> ReverseSelectionRangeRequest:
         return ReverseSelectionRangeRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
         )
 
 
 @dataclass
 class MoveSelectionRangeRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
-    target_start_order: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
+    target_start_bp: np.int64
 
 
 @dataclass
 class MoveSelectionRangeRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
-    target_start_order: int
+    start_bp: int
+    end_bp: int
+    target_start_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
-        self.target_start_order: int = int(request_json['targetStartOrder'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
+        self.target_start_bp: int = int(request_json['targetStartBP'])
 
     def toEntity(self) -> MoveSelectionRangeRequest:
         return MoveSelectionRangeRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
-            np.int64(self.target_start_order)
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
+            np.int64(self.target_start_bp)
         )
 
 
