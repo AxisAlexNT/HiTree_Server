@@ -19,13 +19,12 @@ from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
-from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, ContigDirection
+from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, ContigDirection, ScaffoldBordersBP
 from hict.core.contig_tree import ContigTree
 from hict.core.scaffold_tree import ScaffoldTree
 from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 from readerwriterlock import rwlock
-from HiCT_Library.hict.core.common import ScaffoldBordersBP
 
 from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
@@ -33,11 +32,11 @@ from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, Co
 enable_profiler: bool = True
 
 
-
 data_path: Path = Path('./data')
 mp_manager: multiprocessing.managers.SyncManager = multiprocessing.Manager()
 
 rlock = mp_manager.RLock()
+
 
 def get_rlock():
     return rlock
@@ -46,10 +45,11 @@ def get_rlock():
 app = Flask(__name__)
 if enable_profiler:
     from werkzeug.middleware.profiler import ProfilerMiddleware
-    profile_dir=Path('./profiler')
+    profile_dir = Path('./profiler')
     os.makedirs(profile_dir, exist_ok=True)
     profile_stream = open(f"{str(profile_dir)}/concat.prof", mode="w")
-    app.wsgi_app=ProfilerMiddleware(app.wsgi_app, profile_dir=str(profile_dir.absolute()), stream=profile_stream)
+    app.wsgi_app = ProfilerMiddleware(app.wsgi_app, profile_dir=str(
+        profile_dir.absolute()), stream=profile_stream)
 CORS(app)
 
 chunked_file: Optional[ChunkedFile] = None
@@ -87,23 +87,29 @@ currentTileVersion: int = 0
 versionLock: rwlock.RWLockWrite = rwlock.RWLockWrite(
     lock_factory=get_rlock)
 
+
 def get_contig_descriptors(f: ChunkedFile) -> List[Tuple[ContigDescriptor, ContigDirection]]:
     descriptors: List[ContigDescriptor] = []
+
     def visit_node(n: ContigTree.Node):
         descriptors.append((n.contig_descriptor, n.direction))
     f.contig_tree.traverse(visit_node)
     return descriptors
 
+
 def get_scaffold_descriptors(f: ChunkedFile) -> List[Tuple[ScaffoldDescriptor, ScaffoldBordersBP]]:
     scaffoldTree: ScaffoldTree = f.scaffold_tree
-    descriptors: List[Tuple[ScaffoldDescriptor, ScaffoldBordersBP]] = scaffoldTree.get_scaffold_list()    
+    descriptors: List[Tuple[ScaffoldDescriptor,
+                            ScaffoldBordersBP]] = scaffoldTree.get_scaffold_list()
     return descriptors
+
 
 def generate_assembly_info(f: ChunkedFile) -> AssemblyInfo:
     return AssemblyInfo(
         get_contig_descriptors(chunked_file),
         get_scaffold_descriptors(chunked_file)
     )
+
 
 @app.post("/open")
 def open_file():
@@ -140,6 +146,7 @@ def open_file():
     response.status_code = 200
     return response
 
+
 def generate_open_file_info() -> OpenFileResponseDTO:
     global chunked_file
     tile_size: int = int(max(chunked_file.dense_submatrix_size.values()))
@@ -164,6 +171,7 @@ def generate_open_file_info() -> OpenFileResponseDTO:
 
     return reponseDTO
 
+
 @app.post("/close")
 def close_file():
     global chunked_file
@@ -176,6 +184,7 @@ def close_file():
     response.status_code = 200
     return response
 
+
 @app.post("/reverse_selection_range")
 def reverse_selection_range():
     global chunked_file
@@ -185,8 +194,7 @@ def reverse_selection_range():
     req = ReverseSelectionRangeRequestDTO(request.get_json()).toEntity()
 
     with chunked_file_lock.gen_wlock() as cfl:
-        ContactMatrixFacet.reverse_selection_range(
-            chunked_file, req.start_contig_id, req.end_contig_id)
+        ContactMatrixFacet.reverse_selection_range_bp(chunked_file, req.start_bp, req.end_bp)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -194,6 +202,7 @@ def reverse_selection_range():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @app.post("/get_fasta_for_selection")
 def get_fasta_for_selection():
@@ -217,6 +226,7 @@ def get_fasta_for_selection():
     response.status_code = 200
     return response
 
+
 @app.post("/move_selection_range")
 def move_selection_range():
     global chunked_file
@@ -226,8 +236,8 @@ def move_selection_range():
     req = MoveSelectionRangeRequestDTO(request.get_json()).toEntity()
 
     with chunked_file_lock.gen_wlock() as cfl:
-        ContactMatrixFacet.move_selection_range(
-            chunked_file, req.start_contig_id, req.end_contig_id, req.target_start_order)
+        ContactMatrixFacet.move_selection_range_bp(
+            chunked_file, req.start_bp, req.end_bp, req.target_start_bp)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -235,6 +245,7 @@ def move_selection_range():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @app.post("/load_agp")
 def load_agp():
@@ -256,6 +267,7 @@ def load_agp():
     response.status_code = 200
     return response
 
+
 @app.get("/get_assembly_info")
 def get_assembly_info():
     global chunked_file
@@ -270,24 +282,6 @@ def get_assembly_info():
     response.status_code = 200
     return response
 
-@ app.post("/move")
-def move():
-    global chunked_file
-    if chunked_file is None or chunked_file.state != ChunkedFile.FileState.OPENED:
-        raise Exception("File is not opened?")
-
-    req = request.get_json()
-
-    contig_id: int = int(req['contigId'])
-    target_ord: int = int(req['targetOrder'])
-
-    chunked_file.move_contig_by_id(contig_id, target_ord)
-    resp: dict = {'contig_info': get_contig_descriptors(chunked_file)}
-
-    response = make_response(jsonify(resp))
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.status_code = 200
-    return response
 
 @ app.post("/group_contigs_into_scaffold")
 def group_contigs_into_scaffold():
@@ -299,7 +293,7 @@ def group_contigs_into_scaffold():
 
     with chunked_file_lock.gen_wlock() as cfl:
         ContactMatrixFacet.group_selection_range_into_scaffold(
-            chunked_file, req.start_contig_id, req.end_contig_id, req.name, req.spacer_length)
+            chunked_file, req.start_bp, req.end_bp, req.name, req.spacer_length)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -307,6 +301,7 @@ def group_contigs_into_scaffold():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @ app.post("/ungroup_contigs_from_scaffold")
 def ungroup_contigs_from_scaffold():
@@ -319,7 +314,7 @@ def ungroup_contigs_from_scaffold():
 
     with chunked_file_lock.gen_wlock() as cfl:
         ContactMatrixFacet.ungroup_selection_range(
-            chunked_file, req.start_contig_id, req.end_contig_id)
+            chunked_file, req.start_bp, req.end_bp)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -327,6 +322,7 @@ def ungroup_contigs_from_scaffold():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @ app.post("/save")
 def save():
@@ -346,6 +342,7 @@ def save():
     response.status_code = 200
     return response
 
+
 @ app.post("/list_files")
 def list_files():
     files = list(
@@ -354,6 +351,7 @@ def list_files():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @ app.post("/list_fasta_files")
 def list_fasta_files():
@@ -364,6 +362,7 @@ def list_fasta_files():
     response.status_code = 200
     return response
 
+
 @ app.post("/list_agp_files")
 def list_agp_files():
     files = list(
@@ -372,6 +371,7 @@ def list_agp_files():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @ app.post("/link_fasta")
 def link_fasta():
@@ -387,6 +387,7 @@ def link_fasta():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 @ app.post("/get_fasta_for_assembly")
 def get_fasta_for_assembly():
@@ -404,6 +405,7 @@ def get_fasta_for_assembly():
     response.status_code = 200
     return response
 
+
 @ app.post("/get_agp_for_assembly")
 def get_agp_for_assembly():
     global chunked_file
@@ -420,9 +422,11 @@ def get_agp_for_assembly():
     response.status_code = 200
     return response
 
+
 @ app.get("/get_resolutions")
 def get_resolutions():
     return flask.jsonify(chunked_file.resolutions)
+
 
 @ app.post("/get_current_signal_range")
 def get_current_signal_range():
@@ -447,6 +451,7 @@ def get_current_signal_range():
             "upperBounds": currentMaxSignalValue
         }))
 
+
 @ app.post("/set_contrast_range")
 def set_contrast_range():
     global currentContrastRange
@@ -457,6 +462,7 @@ def set_contrast_range():
     response.status_code = 200
     return response
 
+
 @ app.post("/set_normalization")
 def set_normalization():
     global currentNormalizationSettings
@@ -466,6 +472,7 @@ def set_normalization():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 def normalize_tile(
     raw_tile: np.ndarray,
@@ -487,6 +494,7 @@ def normalize_tile(
             currentNormalizationSettings.postLogLnBase
     return raw_tile
 
+
 def contrast_tile(
     raw_tile: np.ndarray
 ) -> np.ndarray:
@@ -502,6 +510,7 @@ def contrast_tile(
     raw_tile[raw_tile > range] = range
     raw_tile = raw_tile / range
     return raw_tile
+
 
 @app.get("/get_tile")
 def get_tile():
@@ -549,11 +558,11 @@ def get_tile():
     if dense_rect.size > 0:
         minValue = int(dense_rect.min()) if (
             dense_rect.dtype in (np.int64, np.int32,
-                                    np.int16, np.int8)
+                                 np.int16, np.int8)
         ) else float(dense_rect.min())
         maxValue = int(dense_rect.max()) if (
             dense_rect.dtype in (np.int64, np.int32,
-                                    np.int16, np.int8)
+                                 np.int16, np.int8)
         )else float(dense_rect.max())
         with minMaxLock.gen_wlock():
             if level not in currentMinSignalValue.keys() or currentMinSignalValue[level] > minValue:
@@ -566,7 +575,7 @@ def get_tile():
     padded_dense_rect: np.ndarray = np.zeros(
         (tile_size, tile_size), dtype=dense_rect.dtype)
     padded_dense_rect[0:dense_rect.shape[0],
-                        0: dense_rect.shape[1]] = dense_rect
+                      0: dense_rect.shape[1]] = dense_rect
 
     colored_image: np.ndarray = colormap(padded_dense_rect)
     image_matrix: np.ndarray = colored_image[:, :, : 3] * 255
@@ -594,6 +603,7 @@ def get_tile():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
+
 
 def bumpVersion(version: int) -> None:
     global currentTileVersion
@@ -641,6 +651,7 @@ def main():
     app.logger.setLevel(log_level_str)
     app.logger.info(f"Using '{data_path}' as data directory")
     app.run(debug=True)
+
 
 if __name__ == '__main__':
     main()

@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBorders, ContigDirection
-
-from HiCT_Library.hict.core.common import ScaffoldBordersBP
+from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBordersBP, ContigDirection
 
 
 @dataclass
@@ -13,7 +11,7 @@ class ContigDescriptorDTO:
     contigDirection: int
     contigLengthBp: int
     contigLengthBins: Dict[int, int]
-    scaffoldId: Optional[int]
+    # scaffoldId: Optional[int]
     contigPresenceAtResolution: Dict[int, int]
 
     @staticmethod
@@ -45,8 +43,8 @@ class ScaffoldBordersBPDTO:
     @staticmethod
     def fromEntity(borders: Optional[ScaffoldBordersBP]) -> Optional['ScaffoldBordersBPDTO']:
         return ScaffoldBordersBPDTO(
-            int(borders.start_contig_id),
-            int(borders.end_contig_id)
+            int(borders.start_bp),
+            int(borders.end_bp)
         ) if borders is not None else None
 
 
@@ -91,8 +89,8 @@ class AssemblyInfoDTO:
 
 @dataclass
 class GroupContigsIntoScaffoldRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
     name: Optional[str]
     spacer_length: Optional[int]
 
