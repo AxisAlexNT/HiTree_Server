@@ -53,7 +53,7 @@ class ScaffoldDescriptorDTO:
     scaffoldId: int
     scaffoldName: str
     spacerLength: int
-    borders: ScaffoldBordersBP
+    scaffoldBordersBP: ScaffoldBordersBP
 
     @staticmethod
     def fromEntity(descriptor: Tuple[ScaffoldDescriptor, ScaffoldBordersBP]) -> 'ScaffoldDescriptorDTO':
