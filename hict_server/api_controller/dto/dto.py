@@ -60,7 +60,7 @@ class ScaffoldDescriptorDTO:
         return ScaffoldDescriptorDTO(
             int(descriptor[0].scaffold_id),
             descriptor[0].scaffold_name,
-            int(descriptor[0].spacer_length),
+            int(descriptor[0].spacer_length if descriptor[0].spacer_length is not None else 1000),
             ScaffoldBordersBPDTO.fromEntity(descriptor[1])
         )
 
@@ -98,13 +98,13 @@ class GroupContigsIntoScaffoldRequest:
 @dataclass
 class GroupContigsIntoScaffoldRequestDTO:
     start_bp: int
-    start_bp: int
+    end_bp: int
     name: Optional[str]
     spacer_length: Optional[int]
 
     def __init__(self, request_json) -> None:
         self.start_bp: int = int(request_json['startBP'])
-        self.start_bp: int = int(request_json['endBP'])
+        self.end_bp: int = int(request_json['endBP'])
         self.name: Optional[str] = (
             request_json['scaffoldName'] if 'scaffoldName' in request_json.keys() else None)
         self.spacer_length: Optional[int] = int(
@@ -113,7 +113,7 @@ class GroupContigsIntoScaffoldRequestDTO:
     def toEntity(self) -> GroupContigsIntoScaffoldRequest:
         return GroupContigsIntoScaffoldRequest(
             np.int64(self.start_bp),
-            np.int64(self.start_bp),
+            np.int64(self.end_bp),
             self.name if self.name != "" else None,
             self.spacer_length
         )
