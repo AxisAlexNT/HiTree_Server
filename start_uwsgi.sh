@@ -5,4 +5,4 @@ UWSGI_DIR="${SCRIPT_DIR}/../uwsgi_venv/"
 source "${UWSGI_VENV}/bin/activate"
 #export PYTHONPATH="$PYTHONPATH:$HICT_DIR"
 cd "${SCRIPT_DIR}"
-uwsgi --master --enable-threads -p=1 --threads=8 --offload-threads=4 -w hict_server.api_controller.dev_demo_server:app -s 0.0.0.0:5000
+uwsgi --master --no-orphans --enable-threads --threads=16 --offload-threads=8 -w hict_server.api_controller.dev_demo_server:app --http=0.0.0.0:5000
