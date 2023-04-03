@@ -1,0 +1,7 @@
+{
+  "API_SERVER": {
+    "data_path": "./data",
+    "log_level": "INFO",
+    "debug": "true"
+  }
+}
