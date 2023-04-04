@@ -25,6 +25,7 @@ from hict.core.scaffold_tree import ScaffoldTree
 from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 from readerwriterlock import rwlock
+from hict_utils.cool_to_hict.flatten_conv import cool_flatten_convert
 
 from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
 
@@ -194,7 +195,8 @@ def reverse_selection_range():
     req = ReverseSelectionRangeRequestDTO(request.get_json()).toEntity()
 
     with chunked_file_lock.gen_wlock() as cfl:
-        ContactMatrixFacet.reverse_selection_range_bp(chunked_file, req.start_bp, req.end_bp)
+        ContactMatrixFacet.reverse_selection_range_bp(
+            chunked_file, req.start_bp, req.end_bp)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -368,6 +370,35 @@ def list_agp_files():
     files = list(
         sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob("*.agp"))))
     response = flask.jsonify(files)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/list_coolers")
+def list_coolers():
+    files = list(
+        sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob(r"*.[m]cool"))))
+    response = flask.jsonify(files)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/convert_cooler")
+def convert_cooler():
+    cooler = str(request.get_json()['cooler_filename'])
+    dst = Path(data_path.absolute(), str(cooler) + ".hict.hdf5")
+    cool_flatten_convert(
+        src_file_path=Path(data_path.absolute(), cooler),
+        dst_file_path=dst,
+        get_name_and_length_path=(lambda r: f'/resolutions/{str(r)}/chroms'),
+        additional_dataset_creation_args={
+            'shuffle': True,
+            'compression': 'lzf'
+        }
+    )
+    response = flask.jsonify(str(dst.relative_to(data_path)))
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
