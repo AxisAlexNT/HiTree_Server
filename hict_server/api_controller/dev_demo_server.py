@@ -17,6 +17,7 @@ import numpy as np
 from PIL import Image
 from flask import Flask, request, make_response, send_file, jsonify
 from flask_cors import CORS
+from hict_utils.cool_to_hict.flatten_conv import CoolerToHiCTConverter
 from hict.api.ContactMatrixFacet import ContactMatrixFacet
 from hict.core.chunked_file import ChunkedFile
 from hict.core.common import QueryLengthUnit, ContigDescriptor, ScaffoldDescriptor, ContigDirection, ScaffoldBordersBP
@@ -75,6 +76,8 @@ DEFAULT_CONTRAST_RANGE: ContrastRangeSettings = ContrastRangeSettings(
     1.0
 )
 
+converter: Optional[CoolerToHiCTConverter] = None
+
 currentNormalizationSettings: NormalizationSettings = DEFAULT_NORMALIZATION_SETTINGS
 currentContrastRange: ContrastRangeSettings = DEFAULT_CONTRAST_RANGE
 
@@ -85,6 +88,9 @@ minMaxLock: rwlock.RWLockWrite = rwlock.RWLockWrite(
 
 currentTileVersion: int = 0
 versionLock: rwlock.RWLockWrite = rwlock.RWLockWrite(
+    lock_factory=get_rlock)
+
+converterLock: rwlock.RWLockReadD = rwlock.RWLockReadD(
     lock_factory=get_rlock)
 
 
@@ -194,7 +200,8 @@ def reverse_selection_range():
     req = ReverseSelectionRangeRequestDTO(request.get_json()).toEntity()
 
     with chunked_file_lock.gen_wlock() as cfl:
-        ContactMatrixFacet.reverse_selection_range_bp(chunked_file, req.start_bp, req.end_bp)
+        ContactMatrixFacet.reverse_selection_range_bp(
+            chunked_file, req.start_bp, req.end_bp)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
@@ -368,6 +375,73 @@ def list_agp_files():
     files = list(
         sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob("*.agp"))))
     response = flask.jsonify(files)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/list_coolers")
+def list_coolers():
+    files = list(
+        sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob(r"*.[m]cool"))))
+    response = flask.jsonify(files)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/convert_cooler")
+def convert_cooler():
+    global converter
+    cooler = str(request.get_json()['cooler_filename'])
+    dst = Path(data_path.absolute(), str(cooler) + ".hict.hdf5")
+    lock = converterLock.gen_wlock()
+    if lock.acquire():
+        try:
+            converter = CoolerToHiCTConverter(
+                src_file_path=Path(data_path, cooler),
+                dst_file_path=dst,
+                get_name_and_length_path=(
+                    lambda r: f'/resolutions/{str(r)}/chroms'),
+                mp_manager=mp_manager
+            )
+            lock = lock.downgrade()
+            converter.convert(additional_dataset_creation_args={
+                'shuffle': True,
+                'compression': 'lzf'
+            })
+            response = flask.jsonify(str(dst.relative_to(data_path)))
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.status_code = 200
+            return response
+        finally:
+            lock.release()
+
+    response = flask.jsonify(f"Cannot convert file {cooler}")
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 500
+    return response
+
+
+@ app.post("/converter_status")
+def converter_status():
+    # global converter
+    with converterLock.gen_rlock():
+        if converter is not None:
+            converting, rp, tp = converter.get_progress()
+            response = flask.jsonify({
+                "isConverting": converting,
+                "resolutionProgress": float(rp),
+                "totalProgress": float(tp)
+            })
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.status_code = 200
+            return response
+    response = flask.jsonify({
+        "isConverting": False,
+        "resolutionProgress": -1.0,
+        "totalProgress": -1.0
+    })
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
     return response
