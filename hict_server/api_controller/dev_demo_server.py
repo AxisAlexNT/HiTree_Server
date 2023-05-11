@@ -622,8 +622,7 @@ def get_tile():
             y0,
             x1,
             y1,
-            QueryLengthUnit.PIXELS,
-            fetch_cooler_weights=currentNormalizationSettings.coolerBalanceEnabled()
+            QueryLengthUnit.PIXELS
         )
 
     dense_rect: np.ndarray = normalize_tile(
