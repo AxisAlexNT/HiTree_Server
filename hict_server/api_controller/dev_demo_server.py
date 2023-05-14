@@ -221,11 +221,10 @@ def get_fasta_for_selection():
 
     buf = io.BytesIO()
     with chunked_file_lock.gen_wlock() as cfl:
-        chunked_file.get_fasta_for_selection(
-            req.from_bp_x, req.to_bp_x,
-            req.from_bp_y, req.to_bp_y,
-            buf
-        )
+        chunked_file.get_fasta_for_range(req.from_bp_x, req.to_bp_x, buf)
+        buf.write(os.linesep.encode(encoding="utf-8"))
+        chunked_file.get_fasta_for_range(req.from_bp_y, req.to_bp_y, buf)
+        buf.write(os.linesep.encode(encoding="utf-8"))
     buf.seek(0)
 
     response = make_response(send_file(buf, mimetype="text/plain"))
