@@ -299,7 +299,7 @@ def group_contigs_into_scaffold():
 
     with chunked_file_lock.gen_wlock() as cfl:
         ContactMatrixFacet.group_selection_range_into_scaffold(
-            chunked_file, req.start_bp, req.end_bp, req.name, req.spacer_length)
+            chunked_file, req.start_bp, req.end_bp, req.name, req.spacer_length if req.spacer_length is not None else 1000)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(
