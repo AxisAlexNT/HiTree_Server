@@ -27,7 +27,7 @@ from matplotlib import pyplot as plt
 from werkzeug.exceptions import HTTPException
 from readerwriterlock import rwlock
 
-from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, UngroupContigsFromScaffoldRequestDTO
+from hict_server.api_controller.dto.dto import AssemblyInfo, AssemblyInfoDTO, ContigDescriptorDTO, ContrastRangeSettings, ContrastRangeSettingsDTO, GetFastaForSelectionRequestDTO, GroupContigsIntoScaffoldRequestDTO, MoveSelectionRangeRequestDTO, NormalizationSettings, NormalizationSettingsDTO, OpenFileResponse, OpenFileResponseDTO, ReverseSelectionRangeRequestDTO, ScaffoldDescriptorDTO, SplitContigRequestDTO, UngroupContigsFromScaffoldRequestDTO
 
 
 enable_profiler: bool = False
@@ -253,6 +253,30 @@ def move_selection_range():
     return response
 
 
+@app.post("/split_contig_at_bin")
+def split_contig_at_bin():
+    global chunked_file
+    if chunked_file is None or chunked_file.state != ChunkedFile.FileState.OPENED:
+        raise Exception("File is not opened?")
+
+    req = SplitContigRequestDTO(request.get_json()).toEntity()
+
+    with chunked_file_lock.gen_wlock() as cfl:
+        ContactMatrixFacet.split_contig_at_bin(
+            f=chunked_file,
+            split_position=req.split_px,
+            split_resolution=req.bp_resolution,        
+            split_units=QueryLengthUnit.PIXELS
+        )
+        assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
+
+    response = make_response(
+        jsonify(AssemblyInfoDTO.fromEntity(assemblyInfo)))
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
 @app.post("/load_agp")
 def load_agp():
     global chunked_file
@@ -299,7 +323,7 @@ def group_contigs_into_scaffold():
 
     with chunked_file_lock.gen_wlock() as cfl:
         ContactMatrixFacet.group_selection_range_into_scaffold(
-            chunked_file, req.start_bp, req.end_bp, req.name, req.spacer_length)
+            chunked_file, req.start_bp, req.end_bp, req.name, req.spacer_length if req.spacer_length is not None else 1000)
         assemblyInfo: AssemblyInfo = generate_assembly_info(chunked_file)
 
     response = make_response(

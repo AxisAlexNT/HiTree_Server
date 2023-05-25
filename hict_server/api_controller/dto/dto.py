@@ -187,6 +187,28 @@ class MoveSelectionRangeRequestDTO:
             np.int64(self.end_bp),
             np.int64(self.target_start_bp)
         )
+        
+        
+@dataclass
+class SplitContigRequest:
+    split_px: np.int64
+    bp_resolution: np.int64
+
+
+@dataclass
+class SplitContigRequestDTO:
+    split_px: int
+    bp_resolution: int
+
+    def __init__(self, request_json) -> None:
+        self.split_px: int = int(request_json['splitPx'])
+        self.bp_resolution: int = int(request_json['bpResolution'])
+
+    def toEntity(self) -> SplitContigRequest:
+        return SplitContigRequest(
+            np.int64(self.split_px),
+            np.int64(self.bp_resolution),
+        )
 
 
 @dataclass
