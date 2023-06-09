@@ -1,7 +1,7 @@
 #!/bin/bash
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 HICT_DIR="$SCRIPT_DIR/../HiCT_Library/"
-HICT_UTILS_DIR="$SCRIPT_DIR/../HiCT_Utils/"
-export PYTHONPATH="${HICT_DIR}:${HICT_UTILS_DIR}:${PYTHONPATH}"
+export PYTHONPATH="$PYTHONPATH:$HICT_DIR"
 echo "Setting PYTHONPATH=$PYTHONPATH"
+# python3 -m cProfile -o hict_server.prof -m hict_server
 python3 -m hict_server

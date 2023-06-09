@@ -1,3 +1,4 @@
+.idea/
 data/*
 /dist/
 /hict_server.egg-info/
@@ -11,3 +12,4 @@ __pycache__
 .pyc
 **/__pycache__/*
 *.prof
+/profiler

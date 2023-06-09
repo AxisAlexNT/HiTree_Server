@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
-from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBorders
+from hict.core.common import ContigDescriptor, ScaffoldDescriptor, ScaffoldBordersBP, ContigDirection
 
 
 @dataclass
@@ -11,11 +11,11 @@ class ContigDescriptorDTO:
     contigDirection: int
     contigLengthBp: int
     contigLengthBins: Dict[int, int]
-    scaffoldId: Optional[int]
+    # scaffoldId: Optional[int]
     contigPresenceAtResolution: Dict[int, int]
 
     @staticmethod
-    def fromEntity(descriptor: ContigDescriptor) -> 'ContigDescriptorDTO':
+    def fromEntity(descriptor: ContigDescriptor, direction: ContigDirection) -> 'ContigDescriptorDTO':
         contig_length_at_resolution: Dict[int, int] = dict()
         presence_in_resolution: Dict[int, int] = dict()
 
@@ -26,26 +26,25 @@ class ContigDescriptorDTO:
                 presence_in_resolution[int_res] = descriptor.presence_in_resolution[res].value
 
         return ContigDescriptorDTO(
-            int(descriptor.contig_id),
-            str(descriptor.contig_name),
-            descriptor.direction.value,
-            int(descriptor.contig_length_at_resolution[0]),
-            contig_length_at_resolution,
-            str(descriptor.scaffold_id) if descriptor.scaffold_id is not None else None,
-            presence_in_resolution
+            contigId=int(descriptor.contig_id),
+            contigName=str(descriptor.contig_name),
+            contigDirection=direction.value,
+            contigLengthBp=int(descriptor.contig_length_at_resolution[0]),
+            contigLengthBins=contig_length_at_resolution,
+            contigPresenceAtResolution=presence_in_resolution
         )
 
 
 @dataclass
-class ScaffoldBordersDTO:
-    startContigId: int
-    endContigId: int
+class ScaffoldBordersBPDTO:
+    startBP: int
+    endBP: int
 
     @staticmethod
-    def fromEntity(borders: Optional[ScaffoldBorders]) -> Optional['ScaffoldBordersDTO']:
-        return ScaffoldBordersDTO(
-            int(borders.start_contig_id),
-            int(borders.end_contig_id)
+    def fromEntity(borders: Optional[ScaffoldBordersBP]) -> Optional['ScaffoldBordersBPDTO']:
+        return ScaffoldBordersBPDTO(
+            int(borders.start_bp),
+            int(borders.end_bp)
         ) if borders is not None else None
 
 
@@ -53,24 +52,22 @@ class ScaffoldBordersDTO:
 class ScaffoldDescriptorDTO:
     scaffoldId: int
     scaffoldName: str
-    scaffoldBorders: Optional[ScaffoldBordersDTO]
-    scaffoldDirection: int
     spacerLength: int
+    scaffoldBordersBP: ScaffoldBordersBP
 
     @staticmethod
-    def fromEntity(descriptor: ScaffoldDescriptor) -> 'ScaffoldDescriptorDTO':
+    def fromEntity(descriptor: Tuple[ScaffoldDescriptor, ScaffoldBordersBP]) -> 'ScaffoldDescriptorDTO':
         return ScaffoldDescriptorDTO(
-            int(descriptor.scaffold_id),
-            descriptor.scaffold_name,
-            ScaffoldBordersDTO.fromEntity(descriptor.scaffold_borders),
-            int(descriptor.scaffold_direction.value),
-            int(descriptor.spacer_length)
+            int(descriptor[0].scaffold_id),
+            descriptor[0].scaffold_name,
+            int(descriptor[0].spacer_length if descriptor[0].spacer_length is not None else 1000),
+            ScaffoldBordersBPDTO.fromEntity(descriptor[1])
         )
 
 
 @dataclass
 class AssemblyInfo:
-    contigDescriptors: List[ContigDescriptor]
+    contigDescriptors: List[Tuple[ContigDescriptor, ContigDirection]]
     scaffoldDescriptors: List[ScaffoldDescriptor]
 
 
@@ -82,8 +79,8 @@ class AssemblyInfoDTO:
     @staticmethod
     def fromEntity(assembly: AssemblyInfo) -> 'AssemblyInfoDTO':
         return AssemblyInfoDTO(
-            [ContigDescriptorDTO.fromEntity(descriptor)
-             for descriptor in assembly.contigDescriptors],
+            [ContigDescriptorDTO.fromEntity(descriptor, dir)
+             for descriptor, dir in assembly.contigDescriptors],
             [ScaffoldDescriptorDTO.fromEntity(descriptor)
              for descriptor in assembly.scaffoldDescriptors
              ]
@@ -92,22 +89,22 @@ class AssemblyInfoDTO:
 
 @dataclass
 class GroupContigsIntoScaffoldRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
     name: Optional[str]
     spacer_length: Optional[int]
 
 
 @dataclass
 class GroupContigsIntoScaffoldRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    end_bp: int
     name: Optional[str]
     spacer_length: Optional[int]
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
         self.name: Optional[str] = (
             request_json['scaffoldName'] if 'scaffoldName' in request_json.keys() else None)
         self.spacer_length: Optional[int] = int(
@@ -115,8 +112,8 @@ class GroupContigsIntoScaffoldRequestDTO:
 
     def toEntity(self) -> GroupContigsIntoScaffoldRequest:
         return GroupContigsIntoScaffoldRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
             self.name if self.name != "" else None,
             self.spacer_length
         )
@@ -124,71 +121,93 @@ class GroupContigsIntoScaffoldRequestDTO:
 
 @dataclass
 class UngroupContigsFromScaffoldRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
 
 
 @dataclass
 class UngroupContigsFromScaffoldRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    end_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
 
     def toEntity(self) -> UngroupContigsFromScaffoldRequest:
         return UngroupContigsFromScaffoldRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
         )
 
 
 @dataclass
 class ReverseSelectionRangeRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
 
 
 @dataclass
 class ReverseSelectionRangeRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
+    start_bp: int
+    end_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
 
     def toEntity(self) -> ReverseSelectionRangeRequest:
         return ReverseSelectionRangeRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
         )
 
 
 @dataclass
 class MoveSelectionRangeRequest:
-    start_contig_id: np.int64
-    end_contig_id: np.int64
-    target_start_order: np.int64
+    start_bp: np.int64
+    end_bp: np.int64
+    target_start_bp: np.int64
 
 
 @dataclass
 class MoveSelectionRangeRequestDTO:
-    start_contig_id: int
-    end_contig_id: int
-    target_start_order: int
+    start_bp: int
+    end_bp: int
+    target_start_bp: int
 
     def __init__(self, request_json) -> None:
-        self.start_contig_id: int = int(request_json['startContigId'])
-        self.end_contig_id: int = int(request_json['endContigId'])
-        self.target_start_order: int = int(request_json['targetStartOrder'])
+        self.start_bp: int = int(request_json['startBP'])
+        self.end_bp: int = int(request_json['endBP'])
+        self.target_start_bp: int = int(request_json['targetStartBP'])
 
     def toEntity(self) -> MoveSelectionRangeRequest:
         return MoveSelectionRangeRequest(
-            np.int64(self.start_contig_id),
-            np.int64(self.end_contig_id),
-            np.int64(self.target_start_order)
+            np.int64(self.start_bp),
+            np.int64(self.end_bp),
+            np.int64(self.target_start_bp)
+        )
+        
+        
+@dataclass
+class SplitContigRequest:
+    split_px: np.int64
+    bp_resolution: np.int64
+
+
+@dataclass
+class SplitContigRequestDTO:
+    split_px: int
+    bp_resolution: int
+
+    def __init__(self, request_json) -> None:
+        self.split_px: int = int(request_json['splitPx'])
+        self.bp_resolution: int = int(request_json['bpResolution'])
+
+    def toEntity(self) -> SplitContigRequest:
+        return SplitContigRequest(
+            np.int64(self.split_px),
+            np.int64(self.bp_resolution),
         )
 
 

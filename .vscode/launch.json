@@ -1,69 +1,37 @@
 {
-  // Use IntelliSense to learn about possible attributes.
-  // Hover to view descriptions of existing attributes.
-  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "[win-flask] HiCT server from hict source",
-      "type": "python",
-      "request": "launch",
-      "module": "flask",
-      "env": {
-        "PYTHONPATH": "C:\\Users\\tux\\Documents\\HiCT\\HiCT_Library",
-        "FLASK_APP": "hict_server/api_controller/dev_demo_server.py",
-        "FLASK_ENV": "development"
-      },
-      "args": [
-        "run",
-        "--no-debugger",
-        "--verbose"
-      ],
-      "jinja": true,
-      "justMyCode": false
-    },
-    {
-      "name": "[nix] HiCT Server from source",
-      "type": "python",
-      "request": "launch",
-      "module": "hict_server",
-      "env": {
-          "PYTHONPATH": "/home/tux/HiCT/HiCT_library/"
-      },
-      "args": [
-          "--verbose"
-      ],
-      "justMyCode": true
-  },{
-      "name": "[win] HiCT Server from source",
-      "type": "python",
-      "request": "launch",
-      "module": "hict_server",
-      "env": {
-          "PYTHONPATH": "C:\\Users\\tux\\Documents\\HiCT\\HiCT_Library"
-      },
-      "args": [
-          "--verbose"
-      ],
-      "justMyCode": true
-  },
-    /* {
-      "name": "HiCT server from pip hict",
-      "type": "python",
-      "request": "launch",
-      "module": "flask",
-      "env": { "FLASK_APP": "hict_server/api_controller/dev_demo_server.py", "FLASK_ENV": "development" },
-      "args": ["run", "--no-debugger"],
-      "jinja": true,
-      "justMyCode": false
-    },*/
-    {
-      "name": "Python: Module",
-      "type": "python",
-      "request": "launch",
-      "module": "hict_server",
-      "justMyCode": false,
-      "console": "internalConsole"
-    }
-  ]
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File with HiCT_Library from source",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/../../HiCT_Library"
+            }
+        },
+        {
+            "name": "Python: Flask",
+            "type": "python",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "PYTHONPATH": "./../HiCT_Library",
+                "FLASK_APP": "./hict_server/api_controller/dev_demo_server.py",
+                "FLASK_DEBUG": "1"
+            },
+            "args": [
+                "run",
+                "--no-debugger",
+                "--no-reload"
+            ],
+            "jinja": true,
+            "justMyCode": true
+        }
+    ]
 }
