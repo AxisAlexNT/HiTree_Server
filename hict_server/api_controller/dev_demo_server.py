@@ -178,6 +178,27 @@ def generate_open_file_info() -> OpenFileResponseDTO:
     return reponseDTO
 
 
+@app.post("/load_bed_track")
+def load_bed_track():
+    global filename
+    req = request.get_json()
+    filename = req["filename"]
+    app.logger.debug(
+        f"/open: request={request} args={request.args} json={req}")
+    app.logger.info(
+        f"/open: Opening bed track {filename}")
+    if filename is None or filename == "":
+        return "Wrong filename specified", 404
+    # TODO: Fix this
+    path = str(data_path.joinpath(filename).resolve().absolute())
+    resp = open(path, 'r').readlines()
+    response = flask.jsonify(resp)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+
 @app.post("/close")
 def close_file():
     global chunked_file
@@ -387,6 +408,16 @@ def list_files():
 def list_fasta_files():
     files = list(
         sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob("*.fasta"))))
+    response = flask.jsonify(files)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.status_code = 200
+    return response
+
+
+@ app.post("/list_bed_tracks")
+def list_bed_tracks():
+    files = list(
+        sorted(map(lambda p: str(p.relative_to(data_path)), data_path.rglob("*.bed"))))
     response = flask.jsonify(files)
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.status_code = 200
